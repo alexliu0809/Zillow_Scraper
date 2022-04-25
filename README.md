@@ -20,7 +20,7 @@ python3 -m pip install -r requirements.txt
 ```
 
 ## Find a page to scrape
-Find a Zillow page that lists homes to scrape (see below for an example). 
+Find a Zillow page that lists homes to scrape and **COPY its URL**(see below for an example). 
 ![Example Zillow Page](figs/example_zillow_page.png "Example Zillow Page to Scrape")
 
 The page listed above has this URL:
@@ -29,7 +29,7 @@ https://www.zillow.com/san-diego-ca/rentals/2-_beds/?searchQueryState=%7B%22pagi
 ```
 
 ## Copy The URL to the Script and Overwrite the Default URL
-In `zillow_scraper.py`, change the URL placeholder at line 18 to the real URL:
+In `zillow_scraper.py`, change the URL placeholder at line 18 to the real URL copied above:
 ```python
 # Replace "YOUR_ZILLOW_URL" with the URL of the page you are interested in:
 ZILLOW_URL = r"YOUR_ZILLOW_URL"
@@ -63,4 +63,4 @@ while true; do python3 zillow_scraper.py; sleep 7200; done # Run the script ever
 ```
 
 # Disclaimer
-This script is not designed for large-scale scraping. Use it at your own risk.
+This script is not designed for large-scale scraping. Use it at your own risk (licensed under the Apache License).
