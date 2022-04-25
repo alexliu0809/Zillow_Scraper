@@ -1,17 +1,26 @@
-# https://www.geeksforgeeks.org/scrape-content-from-dynamic-websites/
+# Reference: https://www.geeksforgeeks.org/scrape-content-from-dynamic-websites/
 import json 
 import requests
+import smtplib
+import ssl
+import argparse
+import time
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from webdriver_manager.firefox import GeckoDriverManager
-import time
 from datetime import date, datetime
 from os import listdir
 from os.path import isfile, join
-import smtplib
-import ssl
 
+# Put your Zillow URL here
+# Example: "https://www.zillow.com/san-diego-ca/rentals/2-_beds/?searchQueryState=%7B%22pagination%22%3A%7B%7D%2C%22usersSearchTerm%22%3A%2292037%22%2C%22mapBounds%22%3A%7B%22west%22%3A-117.24590349026118%2C%22east%22%3A-117.1956925375024%2C%22south%22%3A32.85766848585083%2C%22north%22%3A32.88506209326565%7D%2C%22mapZoom%22%3A15%2C%22regionSelection%22%3A%5B%7B%22regionId%22%3A54296%2C%22regionType%22%3A6%7D%5D%2C%22isMapVisible%22%3Atrue%2C%22filterState%22%3A%7B%22beds%22%3A%7B%22min%22%3A2%7D%2C%22fore%22%3A%7B%22value%22%3Afalse%7D%2C%22ah%22%3A%7B%22value%22%3Atrue%7D%2C%22sort%22%3A%7B%22value%22%3A%22days%22%7D%2C%22nc%22%3A%7B%22value%22%3Afalse%7D%2C%22cmsn%22%3A%7B%22value%22%3Afalse%7D%2C%22fsba%22%3A%7B%22value%22%3Afalse%7D%2C%22fr%22%3A%7B%22value%22%3Atrue%7D%2C%22fsbo%22%3A%7B%22value%22%3Afalse%7D%2C%22auc%22%3A%7B%22value%22%3Afalse%7D%7D%2C%22isListVisible%22%3Atrue%7D"
+ZILLOW_URL = r"YOUR_ZILLOW_URL"
+SENDING_GMAIL_ACCOUNT = "YOUR_GMAIL_ACCOUNT" # e.g., test@gmail.com
+SENDING_GMAIL_PASSWORD = "YOUR_GMAIL_PASSWORD" # e.g., letmein. Note that you might need to create application specific password for sending email to work.
+RECEIVING_EMAIL_ACCOUNT = ['RECEIVING_EMAIL_ACCOUNT',] # e.g., "alex@hotmail.com"
+
+######### You don't need to modify code below this #########
 ssl.SSLContext.verify_mode = ssl.VerifyMode.CERT_OPTIONAL
 
 class Home:
@@ -65,21 +74,19 @@ def save_current_snapshot(snapshot):
 		for h in snapshot:
 			f.write(str(h)+"\n");
 
-
-
-
-
 def __notify_via_email(diff):
-	try:
-		gmail_user = 'hsyalexliu0809@gmail.com'
-		gmail_password = 'lflnvmvsiygoxcbe' # nskvcsxdvnthjxkk for linux
+	global SENDING_GMAIL_ACCOUNT, SENDING_GMAIL_PASSWORD, RECEIVING_EMAIL_ACCOUNT
+	# No email conf, do not send email.
+	if SENDING_GMAIL_ACCOUNT == "YOUR_GMAIL_ACCOUNT" or SENDING_GMAIL_PASSWORD == "YOUR_GMAIL_PASSWORD" or RECEIVING_EMAIL_ACCOUNT[0] == 'RECEIVING_EMAIL_ACCOUNT':
+		return
 
+	try:
 		server = smtplib.SMTP_SSL('smtp.gmail.com', 465, context=ssl._create_unverified_context())
 		server.ehlo()  # Can be omitted
-		server.login(gmail_user, gmail_password)
+		server.login(SENDING_GMAIL_ACCOUNT, SENDING_GMAIL_PASSWORD)
 
-		sent_from = gmail_user
-		to = ['e7liu@eng.ucsd.edu',]
+		sent_from = SENDING_GMAIL_ACCOUNT
+		
 		subject = 'New House Posted'
 		body = "New Posts:\r\n"
 		for d in diff:
@@ -87,19 +94,19 @@ def __notify_via_email(diff):
 		
 		email_text =  "\r\n".join([
 		"From: {}".format(sent_from),
-		"To: {}".format(", ".join(to)),
+		"To: {}".format(", ".join(RECEIVING_EMAIL_ACCOUNT)),
 		"Subject: New Home Posted",
 		"",
 		"{}".format(body)
 		])
 
-		server.sendmail(sent_from, to, email_text)
+		server.sendmail(sent_from, RECEIVING_EMAIL_ACCOUNT, email_text)
 		server.quit()
 
 	except Exception as e:
 		print('Something went wrong:{}'.format(e))
 
-def compare_notify(current_snap, prev_snap):
+def compare_and_notify(current_snap, prev_snap):
 	if len(prev_snap) == 0:
 		return 
 
@@ -121,16 +128,39 @@ def compare_notify(current_snap, prev_snap):
 		print()
 		__notify_via_email(diff_cleaned)
 
-def main():
-	# Debug
-	# with open("loaded.html", 'r') as f:
-	#   webpage = f.read()
-	#   soup = BeautifulSoup(webpage, "html.parser")
+def parse_home_data(raw_home_data_in_json):
+	address = None
+	beds = None
+	baths = None
+	price = None
 
+	if "address" in raw_home_data_in_json:
+		address = raw_home_data_in_json["address"]
+	
+	if "beds" in raw_home_data_in_json:
+		beds = raw_home_data_in_json["beds"]
+	elif "units" in raw_home_data_in_json and "beds" in raw_home_data_in_json["units"][0]:
+		beds = raw_home_data_in_json["units"][0]["beds"]
+	
+	if "baths" in raw_home_data_in_json:
+		baths = raw_home_data_in_json["baths"]
+	elif "units" in raw_home_data_in_json and "baths" in raw_home_data_in_json["units"][0]:
+		baths = raw_home_data_in_json["units"][0]["baths"]
+
+	if "price" in raw_home_data_in_json:
+		price = raw_home_data_in_json["price"]
+	elif "units" in raw_home_data_in_json and "price" in raw_home_data_in_json["units"][0]:
+		price = raw_home_data_in_json["units"][0]["price"]
+
+	parsed = Home(address, beds, baths, price)
+	return parsed
+
+
+def main():
+	global ZILLOW_URL
 	print("Requesting Data From Zillow")
-	url = r"https://www.zillow.com/san-diego-ca/rentals/2-_beds/?searchQueryState=%7B%22pagination%22%3A%7B%7D%2C%22usersSearchTerm%22%3A%2292037%22%2C%22mapBounds%22%3A%7B%22west%22%3A-117.24590349026118%2C%22east%22%3A-117.1956925375024%2C%22south%22%3A32.85766848585083%2C%22north%22%3A32.88506209326565%7D%2C%22mapZoom%22%3A15%2C%22regionSelection%22%3A%5B%7B%22regionId%22%3A54296%2C%22regionType%22%3A6%7D%5D%2C%22isMapVisible%22%3Atrue%2C%22filterState%22%3A%7B%22beds%22%3A%7B%22min%22%3A2%7D%2C%22fore%22%3A%7B%22value%22%3Afalse%7D%2C%22ah%22%3A%7B%22value%22%3Atrue%7D%2C%22sort%22%3A%7B%22value%22%3A%22days%22%7D%2C%22nc%22%3A%7B%22value%22%3Afalse%7D%2C%22cmsn%22%3A%7B%22value%22%3Afalse%7D%2C%22fsba%22%3A%7B%22value%22%3Afalse%7D%2C%22fr%22%3A%7B%22value%22%3Atrue%7D%2C%22fsbo%22%3A%7B%22value%22%3Afalse%7D%2C%22auc%22%3A%7B%22value%22%3Afalse%7D%7D%2C%22isListVisible%22%3Atrue%7D"
 	driver = webdriver.Firefox(executable_path=GeckoDriverManager().install())
-	driver.get(url) 
+	driver.get(ZILLOW_URL)
 	html = driver.page_source
 	soup = BeautifulSoup(html, "html.parser")
 	driver.quit()
@@ -140,43 +170,22 @@ def main():
 
 	snapshot = []
 	for idx, data in enumerate(variableDatas):
+		# Search for the housing data
 		if "variableData" in str(data):
 			content = "".join(data.contents)
 			content = content.replace("<!--","").replace("-->","").strip()
 			j = json.loads(content)
 			homes = j["cat1"]["searchResults"]["listResults"]
-			for home in homes:
-				address = None
-				beds = None
-				baths = None
-				price = None
-
-				if "address" in home:
-					address = home["address"]
-				
-				if "beds" in home:
-					beds = home["beds"]
-				elif "units" in home and "beds" in home["units"][0]:
-					beds = home["units"][0]["beds"]
-				
-				if "baths" in home:
-					baths = home["baths"]
-				elif "units" in home and "baths" in home["units"][0]:
-					baths = home["units"][0]["baths"]
-
-				if "price" in home:
-					price = home["price"]
-				elif "units" in home and "price" in home["units"][0]:
-					price = home["units"][0]["price"]
-
-				h = Home(address, beds, baths, price)
-				snapshot.append(h)
-
+			for raw_home in homes:
+				parsed = parse_home_data(raw_home)
+				snapshot.append(parsed)
+			# No need to continue
 			break
 
 	prev_snapshot = load_most_recent_snapshot()
 	save_current_snapshot(snapshot)
-	compare_notify(snapshot, prev_snapshot)
+	compare_and_notify(snapshot, prev_snapshot)
+	print("Done scraping once")
 
 if __name__ == "__main__":
 	main()
