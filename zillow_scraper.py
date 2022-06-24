@@ -78,6 +78,7 @@ def __notify_via_email(diff):
 	global SENDING_GMAIL_ACCOUNT, SENDING_GMAIL_PASSWORD, RECEIVING_EMAIL_ACCOUNT
 	# No email conf, do not send email.
 	if SENDING_GMAIL_ACCOUNT == "YOUR_GMAIL_ACCOUNT" or SENDING_GMAIL_PASSWORD == "YOUR_GMAIL_PASSWORD" or RECEIVING_EMAIL_ACCOUNT[0] == 'RECEIVING_EMAIL_ACCOUNT':
+		print('No Email Configured, skipping notfication via email')
 		return
 
 	try:
